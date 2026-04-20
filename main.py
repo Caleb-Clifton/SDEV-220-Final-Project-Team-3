@@ -3,10 +3,39 @@ from budget_tracker import BudgetTracker
 
 tracker = BudgetTracker()
 
-t1 = Transaction(1000, "income", "job", "2026-04-15")
-t2 = Transaction(200, "expense", "food","2026-04-15")
+while True:
+    print("\n1. Add Income")
+    print("2. Add Expense")
+    print("3. Show Balance")
+    print("4. Show Transactions")
+    print("5. Exit")
 
-tracker.add_transaction(t1)
-tracker.add_transaction(t2)
+    choice = input("Choose an option: ")
 
-print("Balance:", tracker.get_balance())
+    if choice == "1":
+        amount = float(input("Enter amount: "))
+        category = input("Enter category: ")
+        date = input("Enter date: ")
+        t = Transaction(amount, "income", category, date)
+        tracker.add_transaction(t)
+
+    elif choice == "2":
+        amount = float(input("Enter amount: "))
+        category = input("Enter category: ")
+        date = input("Enter date: ")
+        t = Transaction(amount, "expense", category, date)
+        tracker.add_transaction(t)
+
+    elif choice == "3":
+        print("Balance:", tracker.get_balance())
+
+    elif choice == "4":
+        for t in tracker.get_transactions():
+            print(t)
+
+    elif choice == "5":
+        break
+
+    else:
+        print("Invalid choice")
+          

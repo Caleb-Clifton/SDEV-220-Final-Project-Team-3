@@ -4,3 +4,5 @@ class Transaction:
         self.t_type = t_type
         self.category = category
         self.date = date
+    def __str__(self):
+        return f"{self.t_type}: ${self.amount} - {self.category} on {self.date}"
