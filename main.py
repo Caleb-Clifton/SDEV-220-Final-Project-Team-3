@@ -9,6 +9,7 @@ while True:
     print("3. Show Balance")
     print("4. Show Transactions")
     print("5. Exit")
+    print("6. Show Category Summary")
 
     choice = input("Choose an option: ")
     if choice == "1":
@@ -75,5 +76,15 @@ while True:
         print("Exiting program...")
         break
 
+    elif choice == "6":
+        summary = tracker.get_category_summary()
+
+        if not summary:
+            print("No expense data available.")
+        else: 
+            print("\nCategory Spending Summary:")
+            for category, total in summary.items():
+                print(f"{category}: ${total}")
+
     else:
-        print("Invalid choice. Please select 1-5.")
+        print("Invalid choice. Please select 1-6.")
