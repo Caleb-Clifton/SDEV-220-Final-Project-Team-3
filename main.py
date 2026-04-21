@@ -11,34 +11,69 @@ while True:
     print("5. Exit")
 
     choice = input("Choose an option: ")
-
     if choice == "1":
-        amount = float(input("Enter amount: "))
-        category = input("Enter category: ")
-        date = input("Enter date: ")
+        try:
+            amount = float(input("Enter amount: "))
+            if amount <= 0:
+                print("Amount must be greater than 0")
+                continue
+        except ValueError:
+            print("Invalid input. Please enter a numeric value.")
+            continue
+
+        category = input("Enter category: ").strip()
+        if category == "":
+            print("Category cannot be empty")
+            continue
+
+        date = input("Enter date: ").strip()
+        if date == "":
+            print("Date cannot be empty")
+            continue
+
         t = Transaction(amount, "income", category, date)
         tracker.add_transaction(t)
 
+    
     elif choice == "2":
-        amount = float(input("Enter amount: "))
-        category = input("Enter category: ")
-        date = input("Enter date: ")
+        try:
+            amount = float(input("Enter amount: "))
+            if amount <= 0:
+                print("Amount must be greater than 0")
+                continue
+        except ValueError:
+            print("Invalid input. Please enter a numeric value.")
+            continue
+
+        category = input("Enter category: ").strip()
+        if category == "":
+            print("Category cannot be empty")
+            continue
+
+        date = input("Enter date: ").strip()
+        if date == "":
+            print("Date cannot be empty")
+            continue
+
         t = Transaction(amount, "expense", category, date)
         tracker.add_transaction(t)
 
     elif choice == "3":
         print("Balance:", tracker.get_balance())
 
+   
     elif choice == "4":
-        for t in tracker.get_transactions():
-            print(t)
+        transactions = tracker.get_transactions()
+        if not transactions:
+            print("No transactions yet.")
+        else:
+            for t in transactions:
+                print(t)
 
+    
     elif choice == "5":
+        print("Exiting program...")
         break
 
     else:
-        print("Invalid choice")
-          
-
-
-# I added this comment to demonstrate branches and commits in Git...
+        print("Invalid choice. Please select 1-5.")
