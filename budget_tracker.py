@@ -29,3 +29,11 @@ class BudgetTracker:
     def get_category_summary(self):
         return self.category_summary
     
+    # load/reload transactions to the program from the database any time a delete or edit transaction is made, and return them as a list of Transaction objects
+    def load_transactions(self, transactions):
+        self.transactions = []
+        self.balance = 0
+        self.category_summary = {}
+
+        for transaction in transactions:
+            self.add_transaction(transaction)
