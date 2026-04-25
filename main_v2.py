@@ -1,8 +1,13 @@
+from datetime import date
+import select
+
 from transaction import Transaction
 from budget_tracker import BudgetTracker
+from database import create_table, delete_transaction, save_transaction, load_transactions, delete_transaction, update_transaction
 
-tracker = BudgetTracker()
-
+def refresh_tracker():
+    saved_transactions = load_transactions()
+    tracker.load_transactions(saved_transactions)
 
 def get_positive_amount():
     try:
@@ -50,6 +55,8 @@ def show_menu():
     print("4. Show Transactions")
     print("5. Exit")
     print("6. Show Category Summary")
+    print("7. Delete Transaction")
+    print("8. Edit Transaction")
 
 
 def run_app():
@@ -60,12 +67,14 @@ def run_app():
         if choice == "1":
             transaction = create_transaction("income")
             if transaction:
-                tracker.add_transaction(transaction)
+                save_transaction(transaction)
+                refresh_tracker()
 
         elif choice == "2":
             transaction = create_transaction("expense")
             if transaction:
-                tracker.add_transaction(transaction)
+                save_transaction(transaction)
+                refresh_tracker()
 
         elif choice == "3":
             print("Balance:", tracker.get_balance())
@@ -75,6 +84,7 @@ def run_app():
             if not transactions:
                 print("No transactions yet.")
             else:
+                print()
                 for transaction in transactions:
                     print(transaction)
 
@@ -91,8 +101,89 @@ def run_app():
                 for category, total in summary.items():
                     print(f"{category}: ${total}")
 
+        elif choice == "7":
+            transactions = tracker.get_transactions()
+
+            if not transactions:
+                print("\nNo transactions to delete.")
+                continue
+            else:
+                print()
+                for transaction in transactions:
+                    print(transaction)
+
+                try:
+                    transaction_id = int(input("\nEnter the ID of the transaction to delete: "))
+                    delete_transaction(transaction_id)
+                    refresh_tracker()
+                    print("Transaction deleted successfully.")
+                except ValueError:
+                    print("Invalid ID. Please enter a valid transaction ID.")
+                    continue
+
+        elif choice == "8":
+            transactions = tracker.get_transactions()
+
+            if not transactions:
+                print("No transactions to edit.")
+                continue
+            else:
+                print()
+                for transaction in transactions:
+                    print(transaction)
+                
+                try:
+                    transaction_id = int(input("\nEnter the ID of the transaction to edit: "))
+                except ValueError:
+                    print("Invalid ID. Please enter a valid transaction ID.")
+                    continue
+                
+                selected_transaction = None
+
+                for transaction in tracker.get_transactions():
+                    if transaction.transaction_id == transaction_id:
+                        selected_transaction = transaction
+                        break
+                
+                if selected_transaction is None:
+                    print("Transaction ID not found.")
+                    continue
+
+                new_type = input(f"Enter new type (leave blank if unchanged) [{selected_transaction.t_type}]: ").strip()
+                if new_type == "":
+                    new_type = selected_transaction.t_type
+
+                new_amount = input(f"Enter new amount (leave blank if unchanged) [{abs(selected_transaction.amount)}]: ").strip()
+                if new_amount == "":
+                    amount = selected_transaction.amount
+                else:
+                    amount = float(new_amount)
+
+                new_category = input(f"Enter new category (leave blank if unchanged) [{selected_transaction.category}]: ").strip()
+                if new_category == "":
+                    new_category = selected_transaction.category
+
+                new_date = input(f"Enter new date (leave blank if unchanged) [{selected_transaction.date}]: ").strip()
+                if new_date == "":
+                    new_date = selected_transaction.date
+
+                if new_type == "expense" and amount > 0:
+                    amount = -amount
+                elif new_type == "income" and amount < 0:
+                    amount = abs(amount)
+
+                updated_transaction = Transaction(amount, new_type, new_category, new_date, transaction_id)
+                update_transaction(updated_transaction)
+                refresh_tracker()
+                print("Transaction updated successfully.")
+
         else:
-            print("Invalid choice. Please select 1-6.")
+            print("Invalid choice. Please select 1-8.")
+
+
+tracker = BudgetTracker()
+create_table()
+refresh_tracker()
 
 
 run_app()
