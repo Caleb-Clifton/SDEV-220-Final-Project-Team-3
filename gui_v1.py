@@ -26,10 +26,10 @@
 # delete_transaction_placeholder()
 # refresh_data_placeholder()
 
+from transaction import create_signed_transaction
+from budget_tracker import BudgetTracker
+from database import create_table, save_transaction, load_transactions, delete_transaction, update_transaction
 
-
-import dis
-from pydoc import text
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -38,7 +38,11 @@ class BudgetTrackerGUI:
         self.root = root
         self.root.title("Budget Tracker")
         self.root.geometry("900x600")
+        self.tracker = BudgetTracker()
+        create_table()
 
+        transactions = load_transactions()
+        self.tracker.load_transactions(transactions)
         self.build_gui()
 
     def build_gui(self):
@@ -50,49 +54,176 @@ class BudgetTrackerGUI:
         entry_frame = tk.LabelFrame(self.root, text="Add Transaction", padx=20, pady=20)
         entry_frame.pack(fill="x", padx=20, pady=10)
 
-        tk.Label(entry_frame, text="GUI input fields will go here").pack()
+        tk.Label(entry_frame, text="Amount").grid(row=0, column=0)
+        self.amount_entry = tk.Entry(entry_frame)
+        self.amount_entry.grid(row=0, column=1)
+
+        tk.Label(entry_frame, text="Type (income/expense)").grid(row=1, column=0)
+        self.type_entry = tk.Entry(entry_frame)
+        self.type_entry.grid(row=1, column=1)
+
+        tk.Label(entry_frame, text="Category").grid(row=2, column=0)
+        self.category_entry = tk.Entry(entry_frame)
+        self.category_entry.grid(row=2, column=1)
+
+        tk.Label(entry_frame, text="Date").grid(row=3, column=0)
+        self.date_entry = tk.Entry(entry_frame)
+        self.date_entry.grid(row=3, column=1)
 
         # Placeholder for action buttons
         button_frame = tk.LabelFrame(self.root, text="Actions", padx=20, pady=20)
         button_frame.pack(fill="x", padx=20, pady=10)
 
-        tk.Button(button_frame, text="Add Transaction", command=self.add_transaction_placeholder).pack(side="left", padx=10)
-        tk.Button(button_frame, text="Edit Transaction", command=self.edit_transaction_placeholder).pack(side="left", padx=10)
-        tk.Button(button_frame, text="Delete Transaction", command=self.delete_transaction_placeholder).pack(side="left", padx=10)
-        tk.Button(button_frame, text="Refresh Data", command=self.refresh_data_placeholder).pack(side="left", padx=10)
-
-        # Placeholder section for transaction display
-        display_frame = tk.LabelFrame(self.root, text="Display Transactions", padx=20, pady=20)
-        display_frame.pack(fill="both", expand=True, padx=20, pady=10)
-
-        tk.Label(display_frame, text="Transaction display will go here").pack()
+        tk.Button(button_frame, text="Add Transaction", command=self.add_transaction).pack(side="left", padx=10)
+        tk.Button(button_frame, text="Edit Transaction", command=self.load_selected_transaction).pack(side="left", padx=10)
+        tk.Button(button_frame, text="Save Edit", command=self.save_edit_transaction).pack(side="left", padx=10)
+        tk.Button(button_frame, text="Delete Transaction", command=self.delete_transaction).pack(side="left", padx=10)
+        tk.Button(button_frame, text="Refresh Data", command=self.refresh_transactions).pack(side="left", padx=10)
 
         # Placeholder section for transaction display
         display_frame = tk.LabelFrame(self.root, text="Transaction Display", padx=20, pady=20)
         display_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-        tk.Label(display_frame, text="Transaction display will go here").pack()
+        columns = ("ID", "Type", "Amount", "Category", "Date")
+        self.transaction_table = ttk.Treeview(display_frame, columns=columns, show="headings")
 
-        # Placeholder section for sumarries
+        for col in columns:
+          self.transaction_table.heading(col, text=col)
+          self.transaction_table.column(col, width=120)
+        self.transaction_table.pack(fill="both", expand=True)
+
+        # summary sections
         summary_frame = tk.LabelFrame(self.root, text="Budget Summary", padx=20, pady=20)
         summary_frame.pack(fill="x", expand=True, padx=20, pady=10)
+        self.summary_label = tk.Label(summary_frame, text="")
+        self.summary_label.pack()
+        self.refresh_transactions()
 
-        tk.Label(summary_frame, text="Balance / Reports / Category summary will go here").pack()
 
+    # transaction methods
+    def add_transaction(self):
+        try:
+           amount = float(self.amount_entry.get())
+           t_type = self.type_entry.get().lower()
+           if t_type not in ["income", "expense"]:
+             messagebox.showerror("Error", "Type must be 'income' or 'expense'")
+             return
+           category = self.category_entry.get()
+           date = self.date_entry.get()
 
-    # Placeholder methods
-    def add_transaction_placeholder(self):
-        messagebox.showinfo("Add Transaction", "Add transaction functionality will be implemented here.")
+           transaction = create_signed_transaction(amount, t_type, category, date)
 
-    def edit_transaction_placeholder(self):
-        messagebox.showinfo("Edit Transaction", "Edit transaction functionality will be implemented here.")
+           save_transaction(transaction)
+           self.tracker.add_transaction(transaction)
 
-    def delete_transaction_placeholder(self):
-        messagebox.showinfo("Delete Transaction", "Delete transaction functionality will be implemented here.")
+           messagebox.showinfo("Success", "Transaction added!")
+           self.refresh_transactions()
+        except Exception as e:
+           messagebox.showerror("Error", str(e))
+    
+    def refresh_transactions(self):
+        for row in self.transaction_table.get_children():
+         self.transaction_table.delete(row)
+        transactions = load_transactions()
+        self.tracker.load_transactions(transactions)
 
-    def refresh_data_placeholder(self):
-        messagebox.showinfo("Refresh Data", "Refresh data functionality will be implemented here.")
+        for transaction in transactions:
+         self.transaction_table.insert(
+            "",
+            "end",
+            values=(
+                transaction.transaction_id,
+                transaction.t_type,
+                f"${transaction.amount:.2f}",
+                transaction.category,
+                transaction.date
+            )
+        )
+         
+        balance = self.tracker.get_balance()
+        category_summary = self.tracker.get_category_summary()
+        summary_text = f"Balance: ${balance:.2f}\n"
 
+        if category_summary:
+           summary_text += "\nCategory Summary:\n"
+           for category, total in category_summary.items():
+             summary_text += f"{category}: ${total:.2f}\n"
+        self.summary_label.config(text=summary_text)
+         
+    def delete_transaction(self):
+        selected_item = self.transaction_table.selection()
+        if not selected_item:
+         messagebox.showwarning("No Selection", "Please select a transaction to delete.")
+         return
+
+        values = self.transaction_table.item(selected_item, "values")
+        transaction_id = values[0]
+
+        confirm = messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this transaction?")
+        if confirm:
+          delete_transaction(transaction_id)
+          self.refresh_transactions()
+          messagebox.showinfo("Deleted", "Transaction deleted successfully.")
+
+    def load_selected_transaction(self):
+         selected_item = self.transaction_table.selection()
+         if not selected_item:
+          messagebox.showwarning("No Selection", "Please select a transaction to edit.")
+          return
+
+         values = self.transaction_table.item(selected_item, "values")
+         self.editing_transaction_id = values[0]
+         self.amount_entry.delete(0, tk.END)
+         self.type_entry.delete(0, tk.END)
+         self.category_entry.delete(0, tk.END)
+         self.date_entry.delete(0, tk.END)
+
+         amount_value = values[2].replace("$", "")
+
+         self.amount_entry.insert(0, amount_value)
+         self.type_entry.insert(0, values[1])
+         self.category_entry.insert(0, values[3])
+         self.date_entry.insert(0, values[4])
+
+         messagebox.showinfo("Edit Mode", "Transaction loaded. Make changes, then click Save Edit.")
+
+    def save_edit_transaction(self):
+         try:
+          if not hasattr(self, "editing_transaction_id"):
+            messagebox.showwarning("No Transaction", "Please select a transaction to edit first.")
+            return
+
+          amount = float(self.amount_entry.get())
+          t_type = self.type_entry.get().lower()
+
+          if t_type not in ["income", "expense"]:
+            messagebox.showerror("Error", "Type must be 'income' or 'expense'")
+            return
+
+          category = self.category_entry.get()
+          date = self.date_entry.get()
+          transaction = create_signed_transaction(
+            amount,
+            t_type,
+            category,
+            date,
+            self.editing_transaction_id
+        )
+          update_transaction(transaction)
+ 
+          self.refresh_transactions()
+
+          self.amount_entry.delete(0, tk.END)
+          self.type_entry.delete(0, tk.END)
+          self.category_entry.delete(0, tk.END)
+          self.date_entry.delete(0, tk.END)
+
+          del self.editing_transaction_id
+
+          messagebox.showinfo("Success", "Transaction updated successfully!")
+
+         except Exception as e:
+           messagebox.showerror("Error", str(e))
     
 def main():
     root = tk.Tk()
