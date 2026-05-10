@@ -37,9 +37,7 @@ def load_transactions():
     conn = connect_db()
     cursor = conn.cursor()
 
-    cursor.execute('''SELECT * FROM transactions
-                   ORDER BY date ASC
-    ''')
+    cursor.execute('SELECT * FROM transactions')
     rows = cursor.fetchall()
 
     conn.close()
@@ -52,7 +50,7 @@ def load_transactions():
             row[2],  # t_type
             row[3],  # category
             row[4],  # date
-            row[0]  # transaction_id
+            row[0]   # transaction_id
         )
         transaction_list.append(transaction)
     

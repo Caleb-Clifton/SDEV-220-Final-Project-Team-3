@@ -1,3 +1,31 @@
+# This file is the starting point for the Tkinter GUI version of the Budget Tracker.
+# It is not connected to the backend yet.
+
+# IMPORTANT:
+# Do not import logic from main_v2.py.
+# main_v2.py will serve as the console-only version of the app.
+# This GUI should import functions from the shared backend files instead:
+# transaction.py, budget_tracker.py, and database.py.
+
+# Suggested backend imports when ready:
+# from transaction import Transaction, create_signed_transaction
+# from budget_tracker import BudgetTracker
+# from database import create_table, save_transaction, load_transactions, update_transaction, delete_transaction
+
+# Suggested GUI connection flow:
+# 1. Create a BudgetTracker object when the GUI starts.
+# 2. Call create_table() to make sure the SQLite table exists.
+# 3. Load saved transactions from the database.
+# 4. Display transactions in the GUI.
+# 5. When Add/Edit/Delete buttons are clicked, update the database first.
+# 6. Refresh the BudgetTracker object and GUI display after every change.
+
+# Placeholder methods below should eventually be replaced with real logic as functions in this file that connect to the backend. For now, they just show message boxes when clicked.
+# add_transaction_placeholder()
+# edit_transaction_placeholder()
+# delete_transaction_placeholder()
+# refresh_data_placeholder()
+
 from transaction import create_signed_transaction
 from budget_tracker import BudgetTracker
 from database import create_table, save_transaction, load_transactions, delete_transaction, update_transaction
