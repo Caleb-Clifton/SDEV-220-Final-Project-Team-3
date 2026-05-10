@@ -50,7 +50,7 @@
 #
 # As before, do not import functionality from main_v2.py.
 # main_v2.py should remain the console/testing version
-# of the application.
+# of the application. 
 
 
 
