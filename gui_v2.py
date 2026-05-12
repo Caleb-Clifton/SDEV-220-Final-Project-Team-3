@@ -511,6 +511,13 @@ class BudgetTrackerGUI:
         try:
             amount = float(self.amount_entry.get())
 
+            if amount <= 0:
+                messagebox.showerror(
+                    "Error",
+                    "Amount must be greater than 0."
+                )
+                return
+
             t_type = self.type_entry.get().lower()
 
             if t_type not in ["income", "expense"]:
@@ -520,8 +527,26 @@ class BudgetTrackerGUI:
                 )
                 return
 
-            category = self.category_entry.get()
-            date = self.date_entry.get()
+            category = self.category_entry.get().strip()
+
+            if category == "":
+                messagebox.showerror(
+                    "Error",
+                    "Category cannot be empty."
+                )
+                return
+
+            date = self.date_entry.get().strip()
+
+            # DATE VALIDATION
+            try:
+                datetime.strptime(date, "%Y-%m-%d")
+            except ValueError:
+                messagebox.showerror(
+                    "Error",
+                    "Invalid date. Use YYYY-MM-DD."
+                )
+                return
 
             transaction = create_signed_transaction(
                 amount,
@@ -541,6 +566,12 @@ class BudgetTrackerGUI:
 
             self.refresh_transactions()
 
+        except ValueError:
+            messagebox.showerror(
+                "Error",
+                "Please enter a valid numeric amount."
+            )
+
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -554,9 +585,22 @@ class BudgetTrackerGUI:
         self.tracker.load_transactions(transactions)
 
         for transaction in transactions:
-            transaction_date = datetime.strptime(transaction.date, "%Y-%m-%d").date()
-            today = datetime.today().date()
-            status = "FUTURE" if transaction_date > today else "CURRENT"
+            try:
+                transaction_date = datetime.strptime(
+                    transaction.date,
+                    "%Y-%m-%d"
+                ).date()
+
+                today = datetime.today().date()
+
+                status = (
+                    "FUTURE"
+                    if transaction_date > today
+                    else "CURRENT"
+                )
+
+            except ValueError:
+                status = "INVALID DATE"
 
             self.transaction_table.insert(
                 "",
@@ -724,17 +768,24 @@ class BudgetTrackerGUI:
         weeks = set()
 
         for transaction in self.tracker.get_transactions():
-            transaction_date = datetime.strptime(
-                transaction.date,
-                "%Y-%m-%d"
-            ).date()
+
+            try:
+                transaction_date = datetime.strptime(
+                    transaction.date,
+                    "%Y-%m-%d"
+                ).date()
+
+            except ValueError:
+                continue
 
             week_start = (
                 transaction_date
                 - timedelta(days=transaction_date.weekday())
             )
 
-            weeks.add(week_start.strftime("%Y-%m-%d"))
+            weeks.add(
+                week_start.strftime("%Y-%m-%d")
+            )
 
         return sorted(weeks)
 
@@ -742,10 +793,13 @@ class BudgetTrackerGUI:
         category_summary = {}
 
         for transaction in self.tracker.get_transactions():
-            transaction_date = datetime.strptime(
-                transaction.date,
-                "%Y-%m-%d"
-            ).date()
+            try:
+                transaction_date = datetime.strptime(
+                    transaction.date,
+                    "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                continue
 
             if start_date <= transaction_date <= end_date:
                 if transaction.t_type == "expense":
@@ -762,10 +816,13 @@ class BudgetTrackerGUI:
         matching_transactions = []
 
         for transaction in self.tracker.get_transactions():
-            transaction_date = datetime.strptime(
-                transaction.date,
-                "%Y-%m-%d"
-            ).date()
+            try:
+                transaction_date = datetime.strptime(
+                    transaction.date,
+                    "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                continue
 
             if start_date <= transaction_date <= end_date:
                 matching_transactions.append(transaction)

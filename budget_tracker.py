@@ -5,10 +5,13 @@ import transaction
 def is_current_transaction(transaction_date):
         today = datetime.today().date()
 
-        parsed_date = datetime.strptime(
-            transaction_date,
-            "%Y-%m-%d"
-        ).date()
+        try:
+            parsed_date = datetime.strptime(
+                transaction_date,
+                "%Y-%m-%d"
+            ).date()
+        except ValueError:
+            return False
 
         return parsed_date <= today
 
