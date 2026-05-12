@@ -22,7 +22,7 @@ class BudgetTrackerGUI:
         title_label = tk.Label(self.root, text="Budget Tracker Application", font=("Arial", 18, "bold"))
         title_label.pack(pady=10)
 
-        # Placeholder for transaction entry
+        # Transaction entry
         entry_frame = tk.LabelFrame(self.root, text="Add Transaction", padx=20, pady=20)
         entry_frame.pack(fill="x", padx=20, pady=10)
 
@@ -42,7 +42,7 @@ class BudgetTrackerGUI:
         self.date_entry = tk.Entry(entry_frame)
         self.date_entry.grid(row=3, column=1)
 
-        # Placeholder for action buttons
+        # Action buttons
         button_frame = tk.LabelFrame(self.root, text="Actions", padx=20, pady=20)
         button_frame.pack(fill="x", padx=20, pady=10)
 
@@ -52,7 +52,7 @@ class BudgetTrackerGUI:
         tk.Button(button_frame, text="Delete Transaction", command=self.delete_transaction).pack(side="left", padx=10)
         tk.Button(button_frame, text="Refresh Data", command=self.refresh_transactions).pack(side="left", padx=10)
 
-        # Placeholder section for transaction display
+        # Transaction display
         display_frame = tk.LabelFrame(self.root, text="Transaction Display", padx=20, pady=20)
         display_frame.pack(fill="both", expand=True, padx=20, pady=10)
 

@@ -505,8 +505,7 @@ class BudgetTrackerGUI:
         self.refresh_transactions()
 
 
-
-    # Existing gui_v1 backend-connected functionality
+    # Functions to power the app logic in the GUI
 
     def add_transaction(self):
         try:
@@ -717,7 +716,7 @@ class BudgetTrackerGUI:
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
-    # Placeholder function used during GUI development for buttons that have not yet been connected to backend logic
+    # Placeholder function used during GUI development for buttons that have not yet been connected to backend logic, left in case more features or buttons are added later
     def placeholder(self):
         print("Placeholder function called")
 
