@@ -1,59 +1,8 @@
-# gui_v2.py is an expansion of gui_v1.py,
-# not a rewrite. Left gui_v1.py intact for reference and backup.
-
-# The Transactions tab below is already fully connected to:
-# - SQLite database storage
-# - BudgetTracker backend logic
-# - Add/Edit/Delete transaction functionality
-# - Transaction refresh logic
-# - Current balance + category summaries
-# Existing working logic was migrated directly from gui_v1.py.
-
-
-# Additional backend features were added to main_v2.py after gui_v1.py
-# and still need GUI hookup in the new tabs.
-
-# New backend logic already exists in:
-# - budget_tracker.py
-# - recurring.py
-
-# New backend-supported features:
-# - Future-dated transaction support
-# - Date-based balance handling
-# - Weekly summaries
-# - Monthly summaries
-# - Recurring transaction generation
-
-# Future transactions are automatically excluded from
-# current balance calculations based on transaction date.
-
-# Current balance logic already exists in:
-# - is_current_transaction()
-# - inside budget_tracker.py
-
-
-# Weekly View tab still needs hookup to:
-# get_weekly_summary()
-
-# Monthly View tab still needs hookup to:
-# get_monthly_summary()
-
-# Recurring Transactions tab still needs hookup to:
-# create_recurring_transactions()
-
-
-# Continue importing backend logic directly from:
-# - transaction.py
-# - budget_tracker.py
-# - database.py
-# - recurring.py
-#
-# As before, do not import functionality from main_v2.py.
-# main_v2.py should remain the console/testing version
-# of the application. 
 
 
 
+from datetime import datetime, timedelta
+import calendar
 from transaction import create_signed_transaction
 from budget_tracker import BudgetTracker
 from database import (
@@ -63,6 +12,7 @@ from database import (
     delete_transaction,
     update_transaction
 )
+from recurring import create_recurring_transactions
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -96,11 +46,10 @@ class BudgetTrackerGUI:
         recurring_tab = tk.Frame(notebook)
 
         notebook.add(transactions_tab, text="Transactions")
+        notebook.add(recurring_tab, text="Recurring Transactions")
         notebook.add(weekly_tab, text="Weekly View")
         notebook.add(monthly_tab, text="Monthly View")
-        notebook.add(recurring_tab, text="Recurring Transactions")
-
-
+        
 
         # Transactions Tab
 
@@ -131,7 +80,13 @@ class BudgetTrackerGUI:
             text="Type (income/expense)"
         ).grid(row=1, column=0)
 
-        self.type_entry = tk.Entry(entry_frame)
+        self.type_var = tk.StringVar(value="expense")
+        self.type_entry = ttk.Combobox(
+            entry_frame,
+            textvariable=self.type_var,
+            values=["income", "expense"],
+            state="readonly"
+        )
         self.type_entry.grid(row=1, column=1)
 
         tk.Label(entry_frame, text="Category").grid(row=2, column=0)
@@ -199,6 +154,7 @@ class BudgetTrackerGUI:
 
         columns = (
             "ID",
+            "Status",
             "Type",
             "Amount",
             "Category",
@@ -241,8 +197,6 @@ class BudgetTrackerGUI:
         )
         weekly_title.pack(pady=10)
 
-        # Weekly Controls
-
         weekly_control_frame = tk.LabelFrame(
             weekly_tab,
             text="Weekly Controls",
@@ -253,53 +207,31 @@ class BudgetTrackerGUI:
 
         tk.Label(
             weekly_control_frame,
-            text="Week Start Date (YYYY-MM-DD)"
+            text="Week Start Date"
         ).grid(row=0, column=0)
 
-        tk.Entry(weekly_control_frame).grid(row=0, column=1)
+        self.week_var = tk.StringVar()
+        self.week_dropdown = ttk.Combobox(
+            weekly_control_frame,
+            textvariable=self.week_var,
+            values=self.get_week_options(),
+            state="readonly"
+        )
+        self.week_dropdown.grid(row=0, column=1)
 
         tk.Button(
             weekly_control_frame,
             text="Load Weekly Summary",
-            command=self.placeholder  # Replace with weekly summary backend logic
+            command=self.load_weekly_summary
         ).grid(row=0, column=2, padx=10)
 
-        # Weekly Financial Summary
-
-        weekly_summary_frame = tk.LabelFrame(
+        self.weekly_summary_label = tk.Label(
             weekly_tab,
-            text="Weekly Financial Summary",
-            padx=20,
-            pady=20
+            text="Select a week to view summary.",
+            justify="left",
+            anchor="w"
         )
-        weekly_summary_frame.pack(fill="x", padx=20, pady=10)
-
-        tk.Label(
-            weekly_summary_frame,
-            text="Starting Balance:"
-        ).pack(anchor="w")
-
-        tk.Label(
-            weekly_summary_frame,
-            text="Total Income:"
-        ).pack(anchor="w")
-
-        tk.Label(
-            weekly_summary_frame,
-            text="Total Expenses:"
-        ).pack(anchor="w")
-
-        tk.Label(
-            weekly_summary_frame,
-            text="Net Change:"
-        ).pack(anchor="w")
-
-        tk.Label(
-            weekly_summary_frame,
-            text="Ending Balance:"
-        ).pack(anchor="w")
-
-        # Weekly Category Summary
+        self.weekly_summary_label.pack(fill="x", padx=20, pady=10)
 
         weekly_category_frame = tk.LabelFrame(
             weekly_tab,
@@ -309,12 +241,13 @@ class BudgetTrackerGUI:
         )
         weekly_category_frame.pack(fill="x", padx=20, pady=10)
 
-        tk.Label(
+        self.weekly_category_label = tk.Label(
             weekly_category_frame,
-            text="Weekly category summary will appear here"
-        ).pack(anchor="w")
-
-        # Weekly Transactions Table
+            text="Weekly category summary will appear here.",
+            justify="left",
+            anchor="w"
+        )
+        self.weekly_category_label.pack(anchor="w")
 
         weekly_transactions_frame = tk.LabelFrame(
             weekly_tab,
@@ -329,17 +262,40 @@ class BudgetTrackerGUI:
             pady=10
         )
 
-        weekly_table = ttk.Treeview(
+        weekly_columns = (
+            "ID",
+            "Type",
+            "Amount",
+            "Category",
+            "Date"
+        )
+
+        self.weekly_table = ttk.Treeview(
             weekly_transactions_frame,
-            columns=columns,
+            columns=weekly_columns,
             show="headings"
         )
 
-        for col in columns:
-            weekly_table.heading(col, text=col)
-            weekly_table.column(col, width=140)
+        for col in weekly_columns:
+            self.weekly_table.heading(col, text=col)
+            self.weekly_table.column(col, width=140)
 
-        weekly_table.pack(fill="both", expand=True)
+        self.weekly_table.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+        weekly_scrollbar = ttk.Scrollbar(
+            weekly_transactions_frame,
+            orient="vertical",
+            command=self.weekly_table.yview
+        )
+        weekly_scrollbar.pack(side="right", fill="y")
+
+        self.weekly_table.configure(
+            yscrollcommand=weekly_scrollbar.set
+        )
 
 
 
@@ -352,8 +308,6 @@ class BudgetTrackerGUI:
         )
         monthly_title.pack(pady=10)
 
-        # Monthly Controls
-
         monthly_control_frame = tk.LabelFrame(
             monthly_tab,
             text="Monthly Controls",
@@ -362,68 +316,53 @@ class BudgetTrackerGUI:
         )
         monthly_control_frame.pack(fill="x", padx=20, pady=10)
 
+        current_year = datetime.today().year
+
         tk.Label(monthly_control_frame, text="Year").grid(
             row=0,
             column=0
         )
 
-        tk.Entry(monthly_control_frame).grid(
-            row=0,
-            column=1
+        self.year_var = tk.StringVar(value=str(current_year))
+        self.year_dropdown = ttk.Combobox(
+            monthly_control_frame,
+            textvariable=self.year_var,
+            values=[
+                str(current_year - 1),
+                str(current_year),
+                str(current_year + 1)
+            ],
+            state="readonly"
         )
+        self.year_dropdown.grid(row=0, column=1)
 
         tk.Label(monthly_control_frame, text="Month").grid(
             row=0,
             column=2
         )
 
-        tk.Entry(monthly_control_frame).grid(
-            row=0,
-            column=3
+        self.month_var = tk.StringVar(value=str(datetime.today().month))
+        self.month_dropdown = ttk.Combobox(
+            monthly_control_frame,
+            textvariable=self.month_var,
+            values=[str(i) for i in range(1, 13)],
+            state="readonly"
         )
+        self.month_dropdown.grid(row=0, column=3)
 
         tk.Button(
             monthly_control_frame,
             text="Load Monthly Summary",
-            command=self.placeholder  # Replace with monthly summary backend logic
+            command=self.load_monthly_summary
         ).grid(row=0, column=4, padx=10)
 
-        # Monthly Financial Summary
-
-        monthly_summary_frame = tk.LabelFrame(
+        self.monthly_summary_label = tk.Label(
             monthly_tab,
-            text="Monthly Financial Summary",
-            padx=20,
-            pady=20
+            text="Select a month to view summary.",
+            justify="left",
+            anchor="w"
         )
-        monthly_summary_frame.pack(fill="x", padx=20, pady=10)
-
-        tk.Label(
-            monthly_summary_frame,
-            text="Starting Balance:"
-        ).pack(anchor="w")
-
-        tk.Label(
-            monthly_summary_frame,
-            text="Total Income:"
-        ).pack(anchor="w")
-
-        tk.Label(
-            monthly_summary_frame,
-            text="Total Expenses:"
-        ).pack(anchor="w")
-
-        tk.Label(
-            monthly_summary_frame,
-            text="Net Change:"
-        ).pack(anchor="w")
-
-        tk.Label(
-            monthly_summary_frame,
-            text="Ending Balance:"
-        ).pack(anchor="w")
-
-        # Monthly Category Summary
+        self.monthly_summary_label.pack(fill="x", padx=20, pady=10)
 
         monthly_category_frame = tk.LabelFrame(
             monthly_tab,
@@ -433,12 +372,13 @@ class BudgetTrackerGUI:
         )
         monthly_category_frame.pack(fill="x", padx=20, pady=10)
 
-        tk.Label(
+        self.monthly_category_label = tk.Label(
             monthly_category_frame,
-            text="Monthly category summary will appear here"
-        ).pack(anchor="w")
-
-        # Monthly Transactions Table
+            text="Monthly category summary will appear here.",
+            justify="left",
+            anchor="w"
+        )
+        self.monthly_category_label.pack(anchor="w")
 
         monthly_transactions_frame = tk.LabelFrame(
             monthly_tab,
@@ -453,17 +393,40 @@ class BudgetTrackerGUI:
             pady=10
         )
 
-        monthly_table = ttk.Treeview(
+        monthly_columns = (
+            "ID",
+            "Type",
+            "Amount",
+            "Category",
+            "Date"
+        )
+
+        self.monthly_table = ttk.Treeview(
             monthly_transactions_frame,
-            columns=columns,
+            columns=monthly_columns,
             show="headings"
         )
 
-        for col in columns:
-            monthly_table.heading(col, text=col)
-            monthly_table.column(col, width=140)
+        for col in monthly_columns:
+            self.monthly_table.heading(col, text=col)
+            self.monthly_table.column(col, width=140)
 
-        monthly_table.pack(fill="both", expand=True)
+        self.monthly_table.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+        monthly_scrollbar = ttk.Scrollbar(
+            monthly_transactions_frame,
+            orient="vertical",
+            command=self.monthly_table.yview
+        )
+        monthly_scrollbar.pack(side="right", fill="y")
+
+        self.monthly_table.configure(
+            yscrollcommand=monthly_scrollbar.set
+        )
 
 
 
@@ -485,39 +448,58 @@ class BudgetTrackerGUI:
         recurring_frame.pack(fill="x", padx=20, pady=10)
 
         tk.Label(recurring_frame, text="Type").grid(row=0, column=0)
-        tk.Entry(recurring_frame).grid(row=0, column=1)
+
+        self.recurring_type_var = tk.StringVar(value="expense")
+        self.recurring_type_entry = ttk.Combobox(
+            recurring_frame,
+            textvariable=self.recurring_type_var,
+            values=["income", "expense"],
+            state="readonly"
+        )
+        self.recurring_type_entry.grid(row=0, column=1)
 
         tk.Label(recurring_frame, text="Amount").grid(row=1, column=0)
-        tk.Entry(recurring_frame).grid(row=1, column=1)
+        self.recurring_amount_entry = tk.Entry(recurring_frame)
+        self.recurring_amount_entry.grid(row=1, column=1)
 
         tk.Label(recurring_frame, text="Category").grid(row=2, column=0)
-        tk.Entry(recurring_frame).grid(row=2, column=1)
+        self.recurring_category_entry = tk.Entry(recurring_frame)
+        self.recurring_category_entry.grid(row=2, column=1)
 
         tk.Label(
             recurring_frame,
             text="Start Date (YYYY-MM-DD)"
         ).grid(row=3, column=0)
 
-        tk.Entry(recurring_frame).grid(row=3, column=1)
+        self.recurring_date_entry = tk.Entry(recurring_frame)
+        self.recurring_date_entry.grid(row=3, column=1)
 
         tk.Label(
             recurring_frame,
             text="Frequency"
         ).grid(row=4, column=0)
 
-        tk.Entry(recurring_frame).grid(row=4, column=1)
+        self.frequency_var = tk.StringVar(value="monthly")
+        self.frequency_entry = ttk.Combobox(
+            recurring_frame,
+            textvariable=self.frequency_var,
+            values=["weekly", "biweekly", "monthly"],
+            state="readonly"
+        )
+        self.frequency_entry.grid(row=4, column=1)
 
         tk.Label(
             recurring_frame,
             text="Repeat Count"
         ).grid(row=5, column=0)
 
-        tk.Entry(recurring_frame).grid(row=5, column=1)
+        self.repeats_entry = tk.Entry(recurring_frame)
+        self.repeats_entry.grid(row=5, column=1)
 
         tk.Button(
             recurring_frame,
             text="Generate Recurring Transactions",
-            command=self.placeholder  # Replace with recurring transaction backend logic
+            command=self.generate_recurring_transactions
         ).grid(row=6, column=0, pady=10)
 
         self.refresh_transactions()
@@ -573,12 +555,16 @@ class BudgetTrackerGUI:
         self.tracker.load_transactions(transactions)
 
         for transaction in transactions:
+            transaction_date = datetime.strptime(transaction.date, "%Y-%m-%d").date()
+            today = datetime.today().date()
+            status = "FUTURE" if transaction_date > today else "CURRENT"
 
             self.transaction_table.insert(
                 "",
                 "end",
                 values=(
                     transaction.transaction_id,
+                    status,
                     transaction.t_type,
                     f"${transaction.amount:.2f}",
                     transaction.category,
@@ -604,6 +590,8 @@ class BudgetTrackerGUI:
                 )
 
         self.summary_label.config(text=summary_text)
+        if hasattr(self, "week_dropdown"):
+            self.week_dropdown["values"] = self.get_week_options()
 
     def delete_transaction(self):
 
@@ -662,12 +650,12 @@ class BudgetTrackerGUI:
         self.category_entry.delete(0, tk.END)
         self.date_entry.delete(0, tk.END)
 
-        amount_value = values[2].replace("$", "")
+        amount_value = values[3].replace("$", "")
 
         self.amount_entry.insert(0, amount_value)
-        self.type_entry.insert(0, values[1])
-        self.category_entry.insert(0, values[3])
-        self.date_entry.insert(0, values[4])
+        self.type_entry.insert(0, values[2])
+        self.category_entry.insert(0, values[4])
+        self.date_entry.insert(0, values[5])
 
         messagebox.showinfo(
             "Edit Mode",
@@ -729,11 +717,272 @@ class BudgetTrackerGUI:
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
-    # Placeholder function
-
+    # Placeholder function used during GUI development for buttons that have not yet been connected to backend logic
     def placeholder(self):
         print("Placeholder function called")
 
+    def get_week_options(self):
+        weeks = set()
+
+        for transaction in self.tracker.get_transactions():
+            transaction_date = datetime.strptime(
+                transaction.date,
+                "%Y-%m-%d"
+            ).date()
+
+            week_start = (
+                transaction_date
+                - timedelta(days=transaction_date.weekday())
+            )
+
+            weeks.add(week_start.strftime("%Y-%m-%d"))
+
+        return sorted(weeks)
+
+    def get_category_summary_for_period(self, start_date, end_date):
+        category_summary = {}
+
+        for transaction in self.tracker.get_transactions():
+            transaction_date = datetime.strptime(
+                transaction.date,
+                "%Y-%m-%d"
+            ).date()
+
+            if start_date <= transaction_date <= end_date:
+                if transaction.t_type == "expense":
+                    category = transaction.category.lower()
+
+                    if category in category_summary:
+                        category_summary[category] += abs(transaction.amount)
+                    else:
+                        category_summary[category] = abs(transaction.amount)
+
+        return category_summary
+
+    def get_transactions_for_period(self, start_date, end_date):
+        matching_transactions = []
+
+        for transaction in self.tracker.get_transactions():
+            transaction_date = datetime.strptime(
+                transaction.date,
+                "%Y-%m-%d"
+            ).date()
+
+            if start_date <= transaction_date <= end_date:
+                matching_transactions.append(transaction)
+
+        return matching_transactions
+
+    def load_weekly_summary(self):
+        week_start = self.week_var.get()
+
+        if week_start == "":
+            messagebox.showwarning(
+                "Missing Week",
+                "Please select a week."
+            )
+            return
+
+        summary = self.tracker.get_weekly_summary(week_start)
+
+        start_date = summary["week_start"]
+        end_date = summary["week_end"]
+
+        starting_balance_date = (
+            start_date - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+
+        starting_balance = self.tracker.get_balance_by_date(
+            starting_balance_date
+        )
+
+        category_summary = self.get_category_summary_for_period(
+            start_date,
+            end_date
+        )
+
+        transactions = self.get_transactions_for_period(
+            start_date,
+            end_date
+        )
+
+        self.weekly_summary_label.config(
+            text=(
+                f"Week: {summary['week_start']} to {summary['week_end']}\n"
+                f"Starting Balance: ${starting_balance:.2f}\n"
+                f"Total Income: ${summary['income']:.2f}\n"
+                f"Total Expenses: ${summary['expenses']:.2f}\n"
+                f"Net Change: ${summary['net']:.2f}\n"
+                f"Ending Balance: ${summary['projected_balance']:.2f}"
+            )
+        )
+
+        category_text = ""
+
+        if category_summary:
+            for category, total in category_summary.items():
+                category_text += f"{category}: ${total:.2f}\n"
+        else:
+            category_text = "No expense categories for this week."
+
+        self.weekly_category_label.config(text=category_text)
+
+        for row in self.weekly_table.get_children():
+            self.weekly_table.delete(row)
+
+        for transaction in transactions:
+            self.weekly_table.insert(
+                "",
+                "end",
+                values=(
+                    transaction.transaction_id,
+                    transaction.t_type,
+                    f"${transaction.amount:.2f}",
+                    transaction.category,
+                    transaction.date
+                )
+            )
+
+    def load_monthly_summary(self):
+        try:
+            year = int(self.year_var.get())
+            month = int(self.month_var.get())
+
+        except ValueError:
+            messagebox.showerror(
+                "Error",
+                "Please select a valid year and month."
+            )
+            return
+
+        summary = self.tracker.get_monthly_summary(year, month)
+
+        start_date = summary["month_start"]
+        end_date = summary["month_end"]
+
+        starting_balance_date = (
+            start_date - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+
+        starting_balance = self.tracker.get_balance_by_date(
+            starting_balance_date
+        )
+
+        category_summary = self.get_category_summary_for_period(
+            start_date,
+            end_date
+        )
+
+        transactions = self.get_transactions_for_period(
+            start_date,
+            end_date
+        )
+
+        self.monthly_summary_label.config(
+            text=(
+                f"Month: {summary['month_start']} to {summary['month_end']}\n"
+                f"Starting Balance: ${starting_balance:.2f}\n"
+                f"Total Income: ${summary['income']:.2f}\n"
+                f"Total Expenses: ${summary['expenses']:.2f}\n"
+                f"Net Change: ${summary['net']:.2f}\n"
+                f"Ending Balance: ${summary['projected_balance']:.2f}"
+            )
+        )
+
+        category_text = ""
+
+        if category_summary:
+            for category, total in category_summary.items():
+                category_text += f"{category}: ${total:.2f}\n"
+        else:
+            category_text = "No expense categories for this month."
+
+        self.monthly_category_label.config(text=category_text)
+
+        for row in self.monthly_table.get_children():
+            self.monthly_table.delete(row)
+
+        for transaction in transactions:
+            self.monthly_table.insert(
+                "",
+                "end",
+                values=(
+                    transaction.transaction_id,
+                    transaction.t_type,
+                    f"${transaction.amount:.2f}",
+                    transaction.category,
+                    transaction.date
+                )
+            )
+
+    def generate_recurring_transactions(self):
+        try:
+            amount = float(self.recurring_amount_entry.get())
+            t_type = self.recurring_type_entry.get().lower()
+            category = self.recurring_category_entry.get()
+            start_date = self.recurring_date_entry.get()
+            frequency = self.frequency_entry.get().lower()
+            repeats = int(self.repeats_entry.get())
+
+            if category == "":
+                messagebox.showerror(
+                    "Error",
+                    "Category cannot be empty."
+                )
+                return
+
+            datetime.strptime(start_date, "%Y-%m-%d")
+
+            if repeats <= 0:
+                messagebox.showerror(
+                    "Error",
+                    "Repeats must be greater than 0."
+                )
+                return
+
+            max_repeats = {
+                "weekly": 52,
+                "biweekly": 26,
+                "monthly": 12
+            }
+
+            if repeats > max_repeats[frequency]:
+                messagebox.showerror(
+                    "Error",
+                    f"Maximum repeats for {frequency} is "
+                    f"{max_repeats[frequency]}."
+                )
+                return
+
+            transactions = create_recurring_transactions(
+                amount,
+                t_type,
+                category,
+                start_date,
+                frequency,
+                repeats
+            )
+
+            for transaction in transactions:
+                save_transaction(transaction)
+
+            self.refresh_transactions()
+
+            self.week_dropdown["values"] = self.get_week_options()
+
+            messagebox.showinfo(
+                "Success",
+                f"{len(transactions)} recurring transactions created."
+            )
+
+        except ValueError:
+            messagebox.showerror(
+                "Error",
+                "Please check amount, date, and repeat count."
+            )
+
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
 def main():
     root = tk.Tk()
