@@ -9,11 +9,11 @@ Ashley Elizabeth King
 
 File structure shown below:
 
+BudgetTrackerApp.py - Current GUI Version of the app
 budget.db - SQLLite3 database file - DELETE TO START FRESH, NEW FILE WILL GENERATE UPON APP LAUNCH
 budget_tracker.py - tracker functionality and class
 database.py - database functions 
 gui_v1.py - deprecated GUI version of the app
-gui_v2.py - Current GUI Version of the app
 main.py - deprecated version of the console app
 main_v2.py - refactor of original main.py with better function organization and additional features. This logic is what was mirrored in gui_v1.py
 recurring.py - recurring transaction functions
