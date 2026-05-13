@@ -9,7 +9,7 @@ Ashley Elizabeth King
 
 File structure shown below:
 
-budget.db - SQLLite3 database file
+budget.db - SQLLite3 database file - DELETE TO START FRESH, NEW FILE WILL GENERATE UPON APP LAUNCH
 budget_tracker.py - tracker functionality and class
 database.py - database functions 
 gui_v1.py - deprecated GUI version of the app
